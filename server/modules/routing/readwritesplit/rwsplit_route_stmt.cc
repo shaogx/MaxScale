@@ -151,6 +151,19 @@ void replace_binary_ps_id(GWBUF* buffer, uint32_t id)
 
 }
 
+bool RWSplitSession::have_connected_slaves() const
+{
+    for (const auto& b: m_backends)
+    {
+        if (b->is_slave() && b->in_use())
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool RWSplitSession::can_attempt_trx_on_slave(route_target_t route_target, uint32_t qtype)
 {
     return m_config.optimistic_trx &&                       // Optimistic transactions are enabled
@@ -159,7 +172,8 @@ bool RWSplitSession::can_attempt_trx_on_slave(route_target_t route_target, uint3
            m_otrx_state == OTRX_INACTIVE &&                 // Not yet in optimistic mode
            TARGET_IS_MASTER(route_target) &&                // The target type is master
            qc_query_is_type(qtype, QUERY_TYPE_BEGIN_TRX) && // The query starts a transaction
-           !session_trx_is_read_only(m_client->session);    // Not a read-only transaction
+           !session_trx_is_read_only(m_client->session) &&  // Not a read-only transaction
+           have_connected_slaves();                         // At least one connected slave
 }
 
 void RWSplitSession::track_optimistic_trx(GWBUF** buffer, otrx_state* next_state, bool* store_stmt)
